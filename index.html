@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>都市探索ランダムエンカウンター・シナリオジェネレーター</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+<div class="max-w-2xl mx-auto p-4">
+  <h1 class="text-2xl font-bold text-center text-yellow-300 mb-1">🏚️ 都市探索シナリオジェネレーター</h1>
+  <p class="text-center text-gray-500 mb-4 text-sm">廃墟・路地裏・地下街のTRPGシナリオをランダム生成</p>
+
+  <!-- Location type -->
+  <div class="bg-gray-800 rounded-xl p-4 mb-4">
+    <h2 class="text-sm font-semibold text-yellow-200 mb-2">場所タイプ</h2>
+    <div class="flex flex-wrap gap-2">
+      <button onclick="setLocation('ruins')" id="loc-ruins" class="px-3 py-1.5 rounded-lg bg-yellow-800 text-yellow-200 text-sm" aria-label="廃墟">🏚️ 廃墟</button>
+      <button onclick="setLocation('alley')" id="loc-alley" class="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400 text-sm" aria-label="路地裏">🌃 路地裏</button>
+      <button onclick="setLocation('underground')" id="loc-underground" class="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400 text-sm" aria-label="地下街">🚇 地下街</button>
+      <button onclick="setLocation('industrial')" id="loc-industrial" class="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400 text-sm" aria-label="廃工場">🏭 廃工場</button>
+      <button onclick="setLocation('random')" class="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400 text-sm font-semibold" aria-label="ランダム">🎲 ランダム</button>
+    </div>
+  </div>
+
+  <!-- Generate button -->
+  <button onclick="generate()" class="w-full py-3 bg-yellow-700 hover:bg-yellow-600 text-white rounded-xl font-bold text-lg mb-4" aria-label="シナリオ生成">🎲 シナリオを生成する</button>
+
+  <!-- Result -->
+  <div id="scenario-result" class="hidden space-y-3">
+    <!-- Location -->
+    <div class="bg-gray-800 rounded-xl p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <span id="loc-emoji" class="text-2xl"></span>
+        <h2 id="loc-name" class="text-lg font-bold text-yellow-200"></h2>
+      </div>
+      <div id="loc-desc" class="text-sm text-gray-300"></div>
+      <div class="mt-2 flex flex-wrap gap-1" id="loc-tags"></div>
+    </div>
+
+    <!-- Characters -->
+    <div class="bg-gray-800 rounded-xl p-4">
+      <h2 class="text-sm font-semibold text-yellow-200 mb-2">👤 出会うキャラクター</h2>
+      <div id="char-info" class="space-y-2"></div>
+    </div>
+
+    <!-- Discoveries -->
+    <div class="bg-gray-800 rounded-xl p-4">
+      <h2 class="text-sm font-semibold text-yellow-200 mb-2">🔍 発見物</h2>
+      <div id="discoveries" class="space-y-1"></div>
+    </div>
+
+    <!-- Hook & Complication -->
+    <div class="bg-gray-800 rounded-xl p-4">
+      <h2 class="text-sm font-semibold text-yellow-200 mb-2">🎭 フック & コンプリケーション</h2>
+      <div id="hook" class="text-sm text-gray-300 mb-2"></div>
+      <div id="complication" class="text-sm text-red-300"></div>
+    </div>
+
+    <!-- Save button -->
+    <button onclick="saveScenario()" class="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm" aria-label="シナリオを保存">📝 このシナリオを保存</button>
+  </div>
+
+  <!-- Saved scenarios -->
+  <div id="saved-scenarios" class="hidden mt-4">
+    <h2 class="text-sm font-semibold text-gray-400 mb-2">保存したシナリオ</h2>
+    <div id="saved-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+  </div>
+</div>
+
+<script>
+const locationData = {
+  ruins: { emoji:'🏚️', name:'廃墟ビル', descs:['雨漏りと腐った床板が危険な廃ビル。かつては高級ホテルだったらしい。','朽ちたアパートの一棟。外壁にグラフィティが描かれている。','廃屋となった工場跡。鉄骨が露出し、ガラスが散乱している。'], tags:['暗闇','腐食','危険','歴史'] },
+  alley: { emoji:'🌃', name:'路地裏', descs:['ネオンが反射する濡れた路地。ゴミ箱が並び、猫の目が光る。','廃業した飲食店が連なる暗い路地。遠くから音楽が聞こえる。','煉瓦造りの路地。洗濯物が上で揺れ、子供の笑い声がどこかから聞こえる。'], tags:['都市','夜','人気','騒音'] },
+  underground: { emoji:'🚇', name:'廃地下街', descs:['使われなくなった地下通路。蛍光灯が点滅し、水が滴る。','閉鎖された地下ショッピングモール。シャッターが並び、暗闇が広がる。','廃駅ホーム。朽ちた広告看板と錆びたベンチが残る。'], tags:['地下','孤立','閉所','反響'] },
+  industrial: { emoji:'🏭', name:'廃工場', descs:['巨大な機械が残る廃工場。油の染みと金属の臭い。','廃化学工場跡。危険物のドラム缶が積み上がっている。','鉄鋼工場の廃墟。溶鉱炉が冷え固まり、天井は穴だらけ。'], tags:['機械','危険物','広大','産業'] },
+};
+
+const characters = [
+  { emoji:'👴', name:'老いた守衛', disposition:'警戒', desc:'長年この場所を見守ってきたという老人。情報を持っているが簡単には話さない', threat:1 },
+  { emoji:'🧒', name:'迷子の子供', disposition:'怯え', desc:'保護者を失った子供。涙目でこちらを見ている。何かを目撃したようだ', threat:0 },
+  { emoji:'🕵️', name:'情報屋', disposition:'計算高い', desc:'暗がりにたたずむ人物。情報を売買しているらしく、値踏みする視線を向けてくる', threat:2 },
+  { emoji:'💀', name:'ストリートギャング', disposition:'敵対', desc:'縄張りを侵されたと感じている若者たち（3〜5人）。アドレナリンが溢れている', threat:4 },
+  { emoji:'🤷', name:'ホームレス', disposition:'警戒', desc:'長年この場所を根城にしている。地理に詳しく、見返りがあれば道案内してくれるかも', threat:0 },
+  { emoji:'👩‍🔬', name:'不審な研究者', disposition:'集中', desc:'メモを取りながら何かを調べている。質問されると「邪魔しないで」と言う', threat:1 },
+  { emoji:'🐕', name:'野良犬の群れ', disposition:'縄張り意識', desc:'4〜6匹の痩せた犬。食料があれば友好的になるかもしれない', threat:3 },
+  { emoji:'🕷️', name:'不可視の存在', disposition:'不明', desc:'何かがいる気配だが姿が見えない。床に引っ掻き傷が残っている', threat:5 },
+];
+
+const discoveryItems = [
+  { emoji:'📦', name:'封印された木箱', desc:'南京錠がかかっている。中から奇妙な音がする' },
+  { emoji:'📖', name:'日記', desc:'数年前の日付。最後のページは「彼らはもうすぐここに来る」で終わっている' },
+  { emoji:'🗝️', name:'古い鍵', desc:'どこかの扉を開けられそうだ。ラベルには読めない文字が刻まれている' },
+  { emoji:'💊', name:'医薬品の袋', desc:'ラベルが消えている。誰かが急いで置き忘れたようだ' },
+  { emoji:'📡', name:'通信機器', desc:'まだ電池が入っている。断片的な会話が聞こえてくる' },
+  { emoji:'💰', name:'大量の現金', desc:'なぜここに？持ち主を探すべきか、このまま持ち去るべきか' },
+  { emoji:'🔑', name:'部屋の鍵', desc:'マスターキーのようだ。近くの施設の全室を開けられるかもしれない' },
+  { emoji:'🩸', name:'血の痕跡', desc:'最近のものだ。どこかへ続いている' },
+  { emoji:'📷', name:'カメラ', desc:'最後に撮影された写真に奇妙なものが写っている' },
+  { emoji:'🗺️', name:'手描きの地図', desc:'この場所の秘密の通路が示されている。X印がついた場所がある' },
+];
+
+const hooks = [
+  'かつてここで失踪事件があった。被害者の遺族から調査を依頼されている。',
+  'この場所に何か価値あるものが隠されているという噂がある。',
+  '謎の組織がこの場所を拠点にしているらしい。証拠を集める必要がある。',
+  '誰かがここからSOSを発信していた。生存者がいるかもしれない。',
+  '昔の仲間がここで何かを見た後、急に変わった。理由を探っている。',
+];
+
+const complications = [
+  '⚠️ 警備員が定期巡回している。見つかれば即通報される。',
+  '⚠️ 建物の一部が崩落寸前。大きな音や振動を避けなければならない。',
+  '⚠️ 有毒ガスが漂っている可能性がある。長時間の滞在は危険だ。',
+  '⚠️ 先客がいる。彼らが敵か味方かは不明だ。',
+  '⚠️ 通信機器が使えない。外部との連絡が取れない状況だ。',
+  '⚠️ 時間制限がある。夜明け前（または夜が来る前）に脱出しなければならない。',
+];
+
+let selectedLocation = 'ruins';
+let currentScenario = null;
+
+function rand(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+function pickN(arr, n) { return [...arr].sort(()=>Math.random()-0.5).slice(0,n); }
+
+function setLocation(loc) {
+  if (loc === 'random') {
+    const locs = Object.keys(locationData);
+    selectedLocation = locs[Math.floor(Math.random()*locs.length)];
+  } else {
+    selectedLocation = loc;
+  }
+  ['ruins','alley','underground','industrial'].forEach(id => {
+    const btn = document.getElementById('loc-' + id);
+    if (!btn) return;
+    btn.className = id===selectedLocation
+      ? 'px-3 py-1.5 rounded-lg bg-yellow-800 text-yellow-200 text-sm'
+      : 'px-3 py-1.5 rounded-lg bg-gray-700 text-gray-400 text-sm';
+  });
+}
+
+function generate() {
+  const loc = locationData[selectedLocation];
+  const chars = pickN(characters, Math.floor(Math.random()*2)+1);
+  const items = pickN(discoveryItems, Math.floor(Math.random()*3)+2);
+  const hook = rand(hooks);
+  const comp = rand(complications);
+
+  currentScenario = { loc: loc.name, hook, complication: comp, timestamp: new Date().toLocaleString('ja-JP') };
+
+  document.getElementById('scenario-result').classList.remove('hidden');
+  document.getElementById('loc-emoji').textContent = loc.emoji;
+  document.getElementById('loc-name').textContent = loc.name;
+  document.getElementById('loc-desc').textContent = rand(loc.descs);
+  document.getElementById('loc-tags').innerHTML = loc.tags.map(t => `<span class="bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded-full">${t}</span>`).join('');
+
+  document.getElementById('char-info').innerHTML = chars.map(c => `
+    <div class="flex items-start gap-2 bg-gray-700/50 rounded-lg p-2">
+      <span class="text-xl">${c.emoji}</span>
+      <div>
+        <div class="text-sm font-semibold text-yellow-200">${c.name} <span class="text-xs text-gray-400">（${c.disposition}）</span></div>
+        <div class="text-xs text-gray-300">${c.desc}</div>
+        <div class="text-xs mt-0.5">脅威度: ${'⚠️'.repeat(c.threat)||'（無害）'}</div>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('discoveries').innerHTML = items.map(i => `
+    <div class="flex items-center gap-2 text-sm"><span class="text-lg">${i.emoji}</span><div><span class="font-semibold text-yellow-200">${i.name}</span> — <span class="text-gray-300">${i.desc}</span></div></div>
+  `).join('');
+
+  document.getElementById('hook').textContent = '🎯 ' + hook;
+  document.getElementById('complication').textContent = comp;
+}
+
+function saveScenario() {
+  if (!currentScenario) return;
+  const saved = JSON.parse(localStorage.getItem('urban-scenarios')||'[]');
+  saved.unshift(currentScenario);
+  localStorage.setItem('urban-scenarios', JSON.stringify(saved.slice(0,20)));
+  renderSaved();
+}
+
+function renderSaved() {
+  const saved = JSON.parse(localStorage.getItem('urban-scenarios')||'[]');
+  if (!saved.length) { document.getElementById('saved-scenarios').classList.add('hidden'); return; }
+  document.getElementById('saved-scenarios').classList.remove('hidden');
+  document.getElementById('saved-list').innerHTML = saved.map(s => `
+    <div class="bg-gray-800 rounded-lg p-2 text-xs">
+      <div class="text-gray-500 mb-1">${s.timestamp} — ${s.loc}</div>
+      <div class="text-gray-300">${s.hook.substring(0,60)}...</div>
+    </div>
+  `).join('');
+}
+
+renderSaved();
+</script>
+</body>
+</html>
